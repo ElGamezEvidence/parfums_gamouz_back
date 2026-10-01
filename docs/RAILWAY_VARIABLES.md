@@ -3,6 +3,9 @@
 > **Ne mettez jamais `DATABASE_URL` dans un fichier JavaScript, React ou Git.**  
 > Railway injecte les secrets au **runtime** via l’onglet **Variables** du service backend.
 
+Le **build** (`npm ci`, `prisma generate`) n’a pas besoin de `DATABASE_URL`.  
+Sans variables, le build peut réussir mais le **démarrage** / healthcheck échouera tant que `DATABASE_URL` et `JWT_SECRET` ne sont pas définis.
+
 ## Service backend (racine du dépôt `parfums_gamouz_back`)
 
 Node **20+** : `.nvmrc`, `package.json` → `engines`, `nixpacks.toml`.  
@@ -17,6 +20,7 @@ Si le build reste en Node 18, ajoutez la variable Railway **`NIXPACKS_NODE_VERSI
 | `CORS_ORIGIN` | Oui | Même URL que le frontend (+ domaines admin si séparés) |
 | `ADMIN_EMAIL` | Oui | `abdelaligamouz@1448` |
 | `ADMIN_INITIAL_PASSWORD` | Recommandé | Uniquement au 1er déploiement, puis retirer |
+| `PUBLIC_API_URL` | Recommandé | URL publique Railway **sans** `/api/v1` (images upload) |
 
 `PORT` est en général **fourni par Railway** — ne pas le fixer en dur.
 
