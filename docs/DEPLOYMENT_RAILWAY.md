@@ -18,7 +18,7 @@ Ce guide détaille la mise en production du backend GAAMOUZE sur la plateforme R
 2. Sélectionnez le dépôt **`parfums_gamouz_back`** (racine = ce projet API, pas de sous-dossier).
 3. **Root Directory** : laissez vide (`.`).
 4. Dans l'onglet **Settings** (ou `railway.json`) :
-   - **Build Command** : `npm ci && npx prisma generate`
+   - **Build Command** : laisser **vide** (Nixpacks fait `npm ci` ; `postinstall` lance `prisma generate`). Ne pas ajouter un second `npm ci`.
    - **Start Command** : `node src/server.js`
    - **Healthcheck Path** : `/api/v1/health`
    - **Healthcheck Timeout** : `100`
