@@ -33,10 +33,20 @@ app.use(
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
+      const netlifyPreview = /^https:\/\/([a-z0-9-]+\.)*netlify\.app$/i.test(origin);
+      let frontendHost = null;
+      try {
+        if (env.FRONTEND_URL) frontendHost = new URL(env.FRONTEND_URL).origin;
+      } catch {
+        frontendHost = null;
+      }
+
       if (
         env.CORS_ORIGIN.includes('*') ||
         env.CORS_ORIGIN.includes(origin) ||
-        origin.startsWith('http://localhost')
+        origin === frontendHost ||
+        origin.startsWith('http://localhost') ||
+        netlifyPreview
       ) {
         callback(null, true);
       } else {
