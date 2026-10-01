@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Build / logs
+dist/
+build/
+logs/
+*.log
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage/
+
+# Uploads (binaires — ne pas versionner)
+uploads/products/*
+!uploads/products/.gitkeep
+
+# Prisma local
+*.db
+*.db-journal
