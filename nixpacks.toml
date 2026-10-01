@@ -1,0 +1,3 @@
+# Neon driver + deps require Node 20+ (Railway default was 18)
+[variables]
+NIXPACKS_NODE_VERSION = "20"

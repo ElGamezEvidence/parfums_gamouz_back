@@ -3,7 +3,10 @@
 > **Ne mettez jamais `DATABASE_URL` dans un fichier JavaScript, React ou Git.**  
 > Railway injecte les secrets au **runtime** via l’onglet **Variables** du service backend.
 
-## Service backend (Root Directory : `backend`)
+## Service backend (racine du dépôt `parfums_gamouz_back`)
+
+Node **20+** : `.nvmrc`, `package.json` → `engines`, `nixpacks.toml`.  
+Si le build reste en Node 18, ajoutez la variable Railway **`NIXPACKS_NODE_VERSION`** = `20`.
 
 | Variable | Obligatoire | Où la mettre |
 |----------|-------------|--------------|
