@@ -794,6 +794,36 @@ export const productController = {
     }
   },
 
+  // ADMIN: DELETE /api/v1/admin/products/:id
+  async adminDeleteProduct(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const existing = await prisma.product.findUnique({
+        where: { id },
+        select: { id: true, sku: true, slug: true },
+      });
+
+      if (!existing) {
+        return next(new AppError('Produit introuvable.', 404, 'PRODUCT_NOT_FOUND'));
+      }
+
+      await prisma.product.delete({ where: { id } });
+
+      await logAuditAction(req, 'DELETE_PRODUCT', 'Product', id, {
+        sku: existing.sku,
+        slug: existing.slug,
+      });
+
+      res.json({
+        success: true,
+        message: 'Produit supprimé définitivement.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // ADMIN: POST /api/v1/admin/inventory/movement
   async adminAdjustStock(req, res, next) {
     try {

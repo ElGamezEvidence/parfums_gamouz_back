@@ -50,6 +50,11 @@ router.get('/products', productController.adminGetProducts);
 router.get('/products/:id', productController.adminGetProductById);
 router.post('/products', validateBody(productCreateSchema), productController.adminCreateProduct);
 router.put('/products/:id', productController.adminUpdateProduct);
+router.delete(
+  '/products/:id',
+  requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
+  productController.adminDeleteProduct
+);
 
 // 3. Inventory & Stock
 router.post('/inventory/movement', productController.adminAdjustStock);
