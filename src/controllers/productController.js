@@ -106,13 +106,18 @@ function slugifyProductName(name) {
 }
 
 /** SKU, slug et prix de base auto si omis (admin). */
-async function fillProductCatalogDefaults(data, db = prisma) {
+async function fillProductCatalogDefaults(data, db = prisma, excludeProductId = null) {
   const nameFr = data.translations?.fr?.name?.trim() || 'Produit';
+  const notSelf = excludeProductId ? { NOT: { id: excludeProductId } } : {};
 
   let slugBase = data.slug?.trim() ? data.slug.trim().toLowerCase() : slugifyProductName(nameFr);
   let slugCandidate = slugBase;
   let slugSuffix = 0;
-  while (await db.product.findUnique({ where: { slug: slugCandidate } })) {
+  while (
+    await db.product.findFirst({
+      where: { slug: slugCandidate, ...notSelf },
+    })
+  ) {
     slugSuffix += 1;
     slugCandidate = `${slugBase}-${slugSuffix}`;
   }
@@ -123,7 +128,11 @@ async function fillProductCatalogDefaults(data, db = prisma) {
     : slugCandidate.replace(/-/g, '_').toUpperCase().slice(0, 48);
   let skuCandidate = skuBase;
   let skuSuffix = 0;
-  while (await db.product.findFirst({ where: { sku: skuCandidate } })) {
+  while (
+    await db.product.findFirst({
+      where: { sku: skuCandidate, ...notSelf },
+    })
+  ) {
     skuSuffix += 1;
     skuCandidate = `${skuBase.slice(0, 40)}_${skuSuffix}`;
   }
@@ -320,12 +329,19 @@ export const productController = {
 
       const currentTrans = translationsByLocale[locale] || translationsByLocale['fr'] || {};
 
+      const defaultVariant =
+        product.variants.find((v) => v.isDefault) || product.variants[0] || null;
+
       const formatted = {
         id: product.id,
         sku: product.sku,
         slug: product.slug,
-        price: Number(product.basePrice),
-        oldPrice: product.salePrice ? Number(product.salePrice) : null,
+        price: Number(defaultVariant?.price ?? product.basePrice),
+        oldPrice: defaultVariant?.salePrice
+          ? Number(defaultVariant.salePrice)
+          : product.salePrice
+            ? Number(product.salePrice)
+            : null,
         currency: product.currency,
         genderCategory: product.genderCategory.toLowerCase(),
         isFeatured: product.isFeatured,
@@ -341,7 +357,10 @@ export const productController = {
         heartNotes: currentTrans.heartNotes ? currentTrans.heartNotes.split(',').map((s) => s.trim()) : [],
         baseNotes: currentTrans.baseNotes ? currentTrans.baseNotes.split(',').map((s) => s.trim()) : [],
         usageAdvice: currentTrans.usageAdvice || '',
-        image: product.images[0]?.url || '',
+        image:
+          product.images.find((img) => img.isPrimary)?.url ||
+          product.images[0]?.url ||
+          '',
         images: product.images.map((img) => img.url),
         variants: product.variants.map((v) => ({
           id: v.id,
@@ -484,6 +503,74 @@ export const productController = {
     }
   },
 
+  // ADMIN: GET /api/v1/admin/products/:id
+  async adminGetProductById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const product = await prisma.product.findUnique({
+        where: { id },
+        include: {
+          translations: true,
+          variants: { orderBy: { price: 'asc' } },
+          images: { orderBy: { displayOrder: 'asc' } },
+        },
+      });
+
+      if (!product) {
+        return next(new AppError('Produit introuvable.', 404, 'PRODUCT_NOT_FOUND'));
+      }
+
+      const translations = { fr: {}, en: {}, ar: {} };
+      for (const t of product.translations) {
+        translations[t.locale] = {
+          name: t.name || '',
+          shortDescription: t.shortDescription || '',
+          fullDescription: t.fullDescription || '',
+          olfactoryFamily: t.olfactoryFamily || '',
+          topNotes: t.topNotes || '',
+          heartNotes: t.heartNotes || '',
+          baseNotes: t.baseNotes || '',
+          usageAdvice: t.usageAdvice || '',
+        };
+      }
+
+      res.json({
+        success: true,
+        data: {
+          id: product.id,
+          sku: product.sku,
+          slug: product.slug,
+          basePrice: Number(product.basePrice),
+          salePrice: product.salePrice ? Number(product.salePrice) : null,
+          genderCategory: product.genderCategory,
+          status: product.status,
+          isFeatured: product.isFeatured,
+          isBestSeller: product.isBestSeller,
+          isNew: product.isNew,
+          categoryId: product.categoryId,
+          translations,
+          variants: product.variants.map((v) => ({
+            id: v.id,
+            volume: v.volume,
+            price: Number(v.price),
+            salePrice: v.salePrice ? Number(v.salePrice) : null,
+            sku: v.sku,
+            stockQuantity: v.stockQuantity,
+            isDefault: v.isDefault,
+          })),
+          images: product.images.map((img) => ({
+            id: img.id,
+            url: img.url,
+            isPrimary: img.isPrimary,
+            displayOrder: img.displayOrder,
+          })),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // ADMIN: POST /api/v1/admin/products
   async adminCreateProduct(req, res, next) {
     try {
@@ -585,22 +672,25 @@ export const productController = {
 
       const existing = await prisma.product.findUnique({
         where: { id },
-        include: { variants: true, translations: true },
+        include: { variants: true, translations: true, images: true },
       });
 
       if (!existing) {
         return next(new AppError('Produit introuvable.', 404, 'PRODUCT_NOT_FOUND'));
       }
 
+      await fillProductCatalogDefaults(data, prisma, id);
+
       await prisma.$transaction(async (tx) => {
-        // Update product main details
         await tx.product.update({
           where: { id },
           data: {
+            sku: data.sku,
+            slug: data.slug,
             basePrice: data.basePrice,
             salePrice: data.salePrice,
             genderCategory: data.genderCategory,
-            categoryId: data.categoryId,
+            categoryId: data.categoryId ?? null,
             isFeatured: data.isFeatured,
             isBestSeller: data.isBestSeller,
             isNew: data.isNew,
@@ -608,7 +698,6 @@ export const productController = {
           },
         });
 
-        // Upsert translations
         if (data.translations) {
           for (const [locale, trans] of Object.entries(data.translations)) {
             await tx.productTranslation.upsert({
@@ -635,6 +724,60 @@ export const productController = {
                 baseNotes: trans.baseNotes,
                 usageAdvice: trans.usageAdvice,
               },
+            });
+          }
+        }
+
+        if (Array.isArray(data.variants)) {
+          const existingIds = new Set(existing.variants.map((v) => v.id));
+          const keptIds = new Set();
+
+          for (const v of data.variants) {
+            const variantPayload = {
+              volume: v.volume,
+              price: Number(v.price),
+              salePrice: v.salePrice != null && v.salePrice !== '' ? Number(v.salePrice) : null,
+              sku: v.sku?.trim()?.toUpperCase() || `${data.sku}-${v.volume}`,
+              stockQuantity: Number(v.stockQuantity) || 0,
+              isDefault: Boolean(v.isDefault),
+            };
+
+            if (v.id && existingIds.has(v.id)) {
+              keptIds.add(v.id);
+              await tx.productVariant.update({
+                where: { id: v.id },
+                data: variantPayload,
+              });
+            } else {
+              await tx.productVariant.create({
+                data: { productId: id, ...variantPayload },
+              });
+            }
+          }
+
+          for (const old of existing.variants) {
+            if (!keptIds.has(old.id)) {
+              const orderLine = await tx.orderItem.count({ where: { variantId: old.id } });
+              if (orderLine === 0) {
+                await tx.productVariant.delete({ where: { id: old.id } });
+              }
+            }
+          }
+        }
+
+        if (Array.isArray(data.images)) {
+          await tx.productImage.deleteMany({ where: { productId: id } });
+          const images = data.images.filter((img) => img.url?.trim());
+          if (images.length) {
+            const hasPrimary = images.some((img) => img.isPrimary);
+            await tx.productImage.createMany({
+              data: images.map((img, idx) => ({
+                productId: id,
+                url: img.url.trim(),
+                altText: img.altText || null,
+                displayOrder: img.displayOrder ?? idx,
+                isPrimary: hasPrimary ? Boolean(img.isPrimary) : idx === 0,
+              })),
             });
           }
         }

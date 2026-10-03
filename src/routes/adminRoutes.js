@@ -47,6 +47,7 @@ router.delete('/media/product/:filename', mediaController.deleteProductImage);
 
 // 2. Products Management
 router.get('/products', productController.adminGetProducts);
+router.get('/products/:id', productController.adminGetProductById);
 router.post('/products', validateBody(productCreateSchema), productController.adminCreateProduct);
 router.put('/products/:id', productController.adminUpdateProduct);
 
