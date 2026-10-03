@@ -16,9 +16,9 @@ export const productQuerySchema = z.object({
 });
 
 export const productCreateSchema = z.object({
-  sku: z.string().min(2, 'Le SKU est requis.').trim().toUpperCase(),
-  slug: z.string().min(2, 'Le slug est requis.').trim().toLowerCase(),
-  basePrice: z.coerce.number().positive('Le prix doit être positif.'),
+  sku: z.string().trim().optional(),
+  slug: z.string().trim().optional(),
+  basePrice: z.coerce.number().min(0).optional(),
   salePrice: z.coerce.number().positive().optional().nullable(),
   genderCategory: z.enum(['MEN', 'WOMEN', 'UNISEX']).default('UNISEX'),
   categoryId: z.string().optional().nullable(),
@@ -64,7 +64,7 @@ export const productCreateSchema = z.object({
         volume: z.string(), // e.g. "30ml", "50ml", "100ml"
         price: z.coerce.number().positive(),
         salePrice: z.coerce.number().positive().optional().nullable(),
-        sku: z.string().toUpperCase(),
+        sku: z.string().trim().optional(),
         stockQuantity: z.coerce.number().int().min(0).default(10),
         alertThreshold: z.coerce.number().int().min(0).default(5),
         isDefault: z.boolean().default(false),
@@ -91,6 +91,62 @@ function productDetailWhere(identifier) {
   const key = String(identifier || '').trim();
   if (UUID_REGEX.test(key)) return { id: key };
   return { slug: key.toLowerCase() };
+}
+
+function slugifyProductName(name) {
+  return (
+    String(name || 'produit')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 72) || 'produit'
+  );
+}
+
+/** SKU, slug et prix de base auto si omis (admin). */
+async function fillProductCatalogDefaults(data, db = prisma) {
+  const nameFr = data.translations?.fr?.name?.trim() || 'Produit';
+
+  let slugBase = data.slug?.trim() ? data.slug.trim().toLowerCase() : slugifyProductName(nameFr);
+  let slugCandidate = slugBase;
+  let slugSuffix = 0;
+  while (await db.product.findUnique({ where: { slug: slugCandidate } })) {
+    slugSuffix += 1;
+    slugCandidate = `${slugBase}-${slugSuffix}`;
+  }
+  data.slug = slugCandidate;
+
+  let skuBase = data.sku?.trim()
+    ? data.sku.trim().toUpperCase()
+    : slugCandidate.replace(/-/g, '_').toUpperCase().slice(0, 48);
+  let skuCandidate = skuBase;
+  let skuSuffix = 0;
+  while (await db.product.findFirst({ where: { sku: skuCandidate } })) {
+    skuSuffix += 1;
+    skuCandidate = `${skuBase.slice(0, 40)}_${skuSuffix}`;
+  }
+  data.sku = skuCandidate;
+
+  const defaultVariant = data.variants?.find((v) => v.isDefault) || data.variants?.[0];
+  const parsedBase = Number(data.basePrice);
+  if (data.basePrice == null || data.basePrice === '' || Number.isNaN(parsedBase)) {
+    data.basePrice = defaultVariant ? Number(defaultVariant.price) : 0;
+  } else {
+    data.basePrice = parsedBase;
+  }
+
+  if (data.variants?.length) {
+    data.variants = data.variants.map((v, idx) => ({
+      ...v,
+      sku:
+        v.sku?.trim()?.toUpperCase() ||
+        `${data.sku}-${String(v.volume || idx + 1).replace(/\s+/g, '')}`,
+    }));
+  }
+
+  return data;
 }
 
 export const productController = {
@@ -432,14 +488,7 @@ export const productController = {
   async adminCreateProduct(req, res, next) {
     try {
       const data = req.body;
-
-      // Check SKU / slug unicity
-      const existing = await prisma.product.findFirst({
-        where: { OR: [{ sku: data.sku }, { slug: data.slug }] },
-      });
-      if (existing) {
-        return next(new AppError('Un produit avec ce SKU ou ce slug existe déjà.', 409, 'DUPLICATE_PRODUCT'));
-      }
+      await fillProductCatalogDefaults(data);
 
       // Execute transaction for product, translations, variants and images
       const created = await prisma.$transaction(async (tx) => {

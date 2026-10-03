@@ -27,7 +27,15 @@ export const createOrderSchema = z.object({
     )
     .min(1, 'Le panier ne peut pas être vide.'),
   couponCode: z.string().optional(),
-  paymentMethod: z.enum(['COD', 'ONLINE']).default('COD'),
+  paymentMethod: z
+    .string()
+    .optional()
+    .transform((val) => {
+      const key = String(val ?? 'cod').trim().toLowerCase();
+      if (key === 'cod') return 'COD';
+      if (['online', 'card', 'transfer'].includes(key)) return 'ONLINE';
+      return 'COD';
+    }),
 });
 
 // Schema for admin status transition

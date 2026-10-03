@@ -4,7 +4,7 @@ Ce dossier **est la racine Git** du dépôt [parfums_gamouz_back](https://github
 
 Le frontend React vit ailleurs (dossier frère `../frontend/` sur votre machine, ou un autre dépôt / hébergeur).
 
-## Commandes (depuis ce dossier racine du d�p�t)
+## Commandes (depuis ce dossier racine du d�p�t)
 
 ```powershell
 cd backend
