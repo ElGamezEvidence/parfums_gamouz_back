@@ -23,6 +23,8 @@ app.use(
   helmet({
     contentSecurityPolicy: false, // Allows flexible integration with static frontends
     crossOriginEmbedderPolicy: false,
+    // Images /uploads must load from Netlify (admin + boutique) — same-origin bloque <img cross-site>
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 

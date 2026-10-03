@@ -18,7 +18,11 @@ PUBLIC_API_URL=http://localhost:3000
 
 En production Railway, définir `PUBLIC_API_URL` sur l'URL publique du service (sans `/api/v1`).
 
-## Railway / production (obligatoire pour images importées)
+## Affichage depuis Netlify
+
+L’API envoie `Cross-Origin-Resource-Policy: cross-origin` sur les réponses (Helmet) pour que les balises `<img>` de la boutique et de l’admin puissent charger `https://VOTRE-API/uploads/...`.
+
+## Railway / production (persistance des fichiers)
 
 Le disque Railway est **éphémère** : après un redeploy, les URLs  
 `https://….railway.app/uploads/products/…` renvoient **404** (images cassées).
