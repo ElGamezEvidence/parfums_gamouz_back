@@ -83,6 +83,16 @@ export const productCreateSchema = z.object({
     .default([]),
 });
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Détail public : slug SEO ou UUID (liens front /product/:id). */
+function productDetailWhere(identifier) {
+  const key = String(identifier || '').trim();
+  if (UUID_REGEX.test(key)) return { id: key };
+  return { slug: key.toLowerCase() };
+}
+
 export const productController = {
   // GET /api/v1/products (Public catalog with filters, search, and pagination)
   async getProducts(req, res, next) {
@@ -220,14 +230,14 @@ export const productController = {
     }
   },
 
-  // GET /api/v1/products/:slug (Single product detail)
+  // GET /api/v1/products/:slugOrId (Single product detail — slug or UUID)
   async getProductBySlug(req, res, next) {
     try {
-      const { slug } = req.params;
+      const { slug: slugOrId } = req.params;
       const locale = req.query.locale || 'fr';
 
       const product = await prisma.product.findUnique({
-        where: { slug },
+        where: productDetailWhere(slugOrId),
         include: {
           translations: true, // load all locales so user can switch dynamically
           variants: { orderBy: { price: 'asc' } },
@@ -242,7 +252,7 @@ export const productController = {
         },
       });
 
-      if (!product || product.status === 'ARCHIVED') {
+      if (!product || product.status !== 'PUBLISHED') {
         return next(new AppError('Produit introuvable.', 404, 'PRODUCT_NOT_FOUND'));
       }
 
