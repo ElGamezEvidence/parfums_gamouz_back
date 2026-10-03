@@ -18,7 +18,26 @@ PUBLIC_API_URL=http://localhost:3000
 
 En production Railway, définir `PUBLIC_API_URL` sur l'URL publique du service (sans `/api/v1`).
 
-## Railway / production
+## Railway / production (obligatoire pour images importées)
 
-Le disque Railway est **éphémère** : les fichiers peuvent disparaître au redéploiement.  
-Pour la production durable, configurez **Cloudinary** ou S3 (variables dans `.env.example`) — à brancher ultérieurement.
+Le disque Railway est **éphémère** : après un redeploy, les URLs  
+`https://….railway.app/uploads/products/…` renvoient **404** (images cassées).
+
+### Solution recommandée : Cloudinary (gratuit)
+
+Dans **Railway → Variables** :
+
+```env
+CLOUDINARY_CLOUD_NAME=votre_cloud
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+Créez un compte sur [cloudinary.com](https://cloudinary.com), copiez les 3 valeurs du dashboard.  
+Redeploy → réimportez les images en admin → **Enregistrer le produit**.
+
+Les URLs deviennent du type `https://res.cloudinary.com/...` (permanentes).
+
+### Alternative : volume Railway
+
+Monter un volume persistant sur `/app/uploads` dans le service Railway (les fichiers locaux survivent aux redeploys).

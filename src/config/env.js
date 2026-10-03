@@ -34,4 +34,7 @@ export const env = {
   ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD || '',
   /** URL publique du backend (sans /api/v1) — URLs des images uploadées */
   PUBLIC_API_URL: (process.env.PUBLIC_API_URL || '').replace(/\/$/, ''),
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
 };

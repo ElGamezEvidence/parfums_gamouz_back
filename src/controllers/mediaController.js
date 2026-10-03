@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs';
-import { getPublicApiBaseUrl } from '../utils/publicUrl.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { logAuditAction } from '../middleware/audit.js';
 import { UPLOAD_DIR } from '../middleware/upload.js';
+import { publishProductImageFile } from '../services/imageStorage.js';
 
 export const mediaController = {
   /** POST /api/v1/admin/media/upload — fichier unique (champ "image") */
@@ -13,24 +13,17 @@ export const mediaController = {
         return next(new AppError('Aucun fichier image reçu.', 400, 'NO_FILE'));
       }
 
-      const publicBase = getPublicApiBaseUrl(req);
-      const relativePath = `/uploads/products/${req.file.filename}`;
-      const publicUrl = `${publicBase}${relativePath}`;
+      const published = await publishProductImageFile(req, req.file);
 
       await logAuditAction(req, 'UPLOAD_PRODUCT_IMAGE', 'Media', req.file.filename, {
         size: req.file.size,
         mime: req.file.mimetype,
+        storage: published.storage,
       });
 
       res.status(201).json({
         success: true,
-        data: {
-          url: publicUrl,
-          path: relativePath,
-          filename: req.file.filename,
-          size: req.file.size,
-          mimeType: req.file.mimetype,
-        },
+        data: published,
       });
     } catch (err) {
       next(err);
@@ -45,20 +38,14 @@ export const mediaController = {
         return next(new AppError('Aucun fichier image reçu.', 400, 'NO_FILE'));
       }
 
-      const publicBase = getPublicApiBaseUrl(req);
-      const uploaded = files.map((file) => {
-        const relativePath = `/uploads/products/${file.filename}`;
-        return {
-          url: `${publicBase}${relativePath}`,
-          path: relativePath,
-          filename: file.filename,
-          size: file.size,
-          mimeType: file.mimetype,
-        };
-      });
+      const uploaded = [];
+      for (const file of files) {
+        uploaded.push(await publishProductImageFile(req, file));
+      }
 
       await logAuditAction(req, 'UPLOAD_PRODUCT_IMAGES', 'Media', null, {
         count: uploaded.length,
+        storage: uploaded[0]?.storage,
       });
 
       res.status(201).json({
